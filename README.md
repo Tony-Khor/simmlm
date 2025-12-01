@@ -10,8 +10,8 @@ The repo contains the codebase used for our main task (**BraTS 2018**) in the pa
 As described in our paper, we preprocess the raw MRI scans using the nnUNet preprocessing pipeline.  
 You may either:
 
-- Download the raw BraTS 2018 data **[here](#https://www.kaggle.com/datasets/sanglequang/brats2018)** and run nnUNet preprocessing yourself using the official nnUNet repository: **[nnUNet GitHub Repo](#https://github.com/MIC-DKFZ/nnUNet)**  
-- Download our preprocessed, reay-to-use dataset: **[Preprocessed BraTS 2018 Data](#https://drive.google.com/file/d/1aCu15hDd4k0ea2MQP_5wGDXasIWlx0Iu/view?usp=sharing)**
+- Download the raw BraTS 2018 data **[here](https://www.kaggle.com/datasets/sanglequang/brats2018)** and run nnUNet preprocessing yourself using the official nnUNet repository: **[nnUNet GitHub Repo](https://github.com/MIC-DKFZ/nnUNet)**.  
+- Download our preprocessed, reay-to-use dataset: **[Preprocessed BraTS 2018 Data](https://drive.google.com/file/d/1aCu15hDd4k0ea2MQP_5wGDXasIWlx0Iu/view?usp=sharing)**.
 
 Place the preprocessed samples here:
 
@@ -38,7 +38,7 @@ Note that, although we only trained with the fold-0 split, the main results repo
 
 ### 3. BraTS 2018 Official Validation Set
 
-The official validation set (without labels) can be downloaded from **[this link](https://www.kaggle.com/datasets/sanglequang/brats2018?select=MICCAI_BraTS_2018_Data_Validation)**
+The official validation set (without labels) can be downloaded from **[this link](https://www.kaggle.com/datasets/sanglequang/brats2018?select=MICCAI_BraTS_2018_Data_Validation)**.
 
 Place all validation samples in:
 

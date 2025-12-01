@@ -64,7 +64,8 @@ This script will automatically create a working environment named **simmlm** wit
 
 ---
 
-## Running stage 1: independent learning (Modality experts pretraining)
+## Running Stage 1: Independent Learning 
+### Modality experts pretraining
 
 Run the following script:
 
@@ -84,7 +85,8 @@ Note that all four modality experts need to be pretrained one-by-one. However, y
 
 ---
 
-## Running stage 2: cooperative learning (DMoME training with MoFe ranking loss)
+## Running Stage 2: Cooperative Learning 
+### DMoME training with MoFe ranking loss
 
 Run:
 

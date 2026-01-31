@@ -11,7 +11,14 @@ from datetime import datetime
 import SimpleITK as sitk
 from pytorch_lightning.utilities.seed import seed_everything
 
-from dataset.processors import SingleStreamDataset, BratsEvalSet, PairedDataset, LldMmriDataset, LldMmriPairedDataset
+from dataset.processors import (
+    SingleStreamDataset,
+    BratsEvalSet,
+    PairedDataset,
+    LldMmriDataset,
+    LldMmriPairedDataset,
+    LldMmriPreprocessedDataset,
+)
 from configs_joint_training import DatasetConfig, TrainingConfig, ModelConfig
 from train.trainer_joint_training import train_model
 from models.dmome import DMoMEOutputLevel, DMoMEFeatureLevel, DMoMEProbLevel
@@ -20,35 +27,44 @@ from models.momke import MoMKE
 
 def _get_dataset_cls():
     if DatasetConfig.DATASET_NAME == 'lld-mmri':
+        if DatasetConfig.USE_PREPROCESSED:
+            return LldMmriPreprocessedDataset
         return LldMmriDataset
     return SingleStreamDataset
 
 
 def _get_train_dataset_cls():
     if DatasetConfig.DATASET_NAME == 'lld-mmri':
+        if DatasetConfig.USE_PREPROCESSED:
+            return LldMmriPreprocessedDataset
         return LldMmriPairedDataset
     return PairedDataset
 
 
 def _get_dataset_kwargs():
     if DatasetConfig.DATASET_NAME == 'lld-mmri':
-        return {
-            'modalities': DatasetConfig.MODALITIES,
-            'label_modality': DatasetConfig.LABEL_MODALITY,
+        dataset_kwargs = {
             'split_ratios': DatasetConfig.SPLIT_RATIOS,
             'seed': TrainingConfig.RANDOM_SEED,
         }
+        if not DatasetConfig.USE_PREPROCESSED:
+            dataset_kwargs.update({
+                'modalities': DatasetConfig.MODALITIES,
+                'label_modality': DatasetConfig.LABEL_MODALITY,
+            })
+        return dataset_kwargs
     return {}
 
 
 def get_val_ds():
     dataset_cls = _get_dataset_cls()
     dataset_kwargs = _get_dataset_kwargs()
+    dataset_dir = DatasetConfig.PREPROCESSED_DIR if DatasetConfig.USE_PREPROCESSED else DatasetConfig.DATASET_DIR
     if DatasetConfig.VAL_DROP_MODE == 'all':
         val_ds = None
         for dropped_mods in DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS:
             cur_ds = dataset_cls(
-                sample_type='val', dataset_dir=DatasetConfig.DATASET_DIR,
+                sample_type='val', dataset_dir=dataset_dir,
                 splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
                 drop_mode=dropped_mods,
                 possible_dropped_modality_combinations=DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS,
@@ -61,7 +77,7 @@ def get_val_ds():
                 val_ds = torch.utils.data.ConcatDataset([val_ds, cur_ds])
     else:
         val_ds = dataset_cls(
-            sample_type='val', dataset_dir=DatasetConfig.DATASET_DIR, splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
+            sample_type='val', dataset_dir=dataset_dir, splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
             drop_mode=DatasetConfig.VAL_DROP_MODE,
             possible_dropped_modality_combinations=DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS,
             fold=DatasetConfig.FOLD,
@@ -169,8 +185,9 @@ def main():
 
     dataset_cls = _get_train_dataset_cls()
     dataset_kwargs = _get_dataset_kwargs()
+    dataset_dir = DatasetConfig.PREPROCESSED_DIR if DatasetConfig.USE_PREPROCESSED else DatasetConfig.DATASET_DIR
     train_ds = dataset_cls(
-        sample_type='train', dataset_dir=DatasetConfig.DATASET_DIR, splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
+        sample_type='train', dataset_dir=dataset_dir, splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
         drop_mode=DatasetConfig.DROP_MODE,
         possible_dropped_modality_combinations=DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS,
         fold=DatasetConfig.FOLD,
@@ -216,7 +233,7 @@ def main():
         for dropped_mods in DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS:
 
             test_ds = dataset_cls(
-                sample_type='test', dataset_dir=DatasetConfig.DATASET_DIR,
+                sample_type='test', dataset_dir=dataset_dir,
                 splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
                 drop_mode=dropped_mods,
                 possible_dropped_modality_combinations=DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS,

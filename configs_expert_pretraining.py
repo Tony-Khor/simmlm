@@ -18,6 +18,8 @@ class UNetConfig:
 class DatasetConfig:
     DATASET_NAME = 'lld-mmri'
     DATASET_DIR = 'assets/data/lld-mmri'
+    PREPROCESSED_DIR = 'assets/data/lld-mmri_preprocessed'
+    USE_PREPROCESSED = False
     SPLITS_FILE_PATH = None
     EVAL_SET_DIR = None
     MODALITIES = ['C+A', 'C+Delay', 'C+V', 'C-pre', 'DWI', 'InPhase', 'OutPhase', 'T2WI']

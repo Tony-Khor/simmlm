@@ -201,6 +201,126 @@ class LldMmriDataset(Dataset):
         return sample
 
 
+class LldMmriPreprocessedDataset(Dataset):
+    def __init__(
+            self,
+            sample_type: str,
+            dataset_dir: str,
+            splits_file_path: str,
+            drop_mode: Union[None, str, List],
+            possible_dropped_modality_combinations: List,
+            fold: int = 0,
+            unimodality: bool = False,
+            split_ratios=(0.8, 0.1, 0.1),
+            seed: int = 12345,
+    ):
+        assert sample_type in [
+            'train', 'val', 'test'
+        ], f'Invalid sample type: {sample_type}. Must be one of ["train", "val", "test"]'
+
+        self.sample_type = sample_type
+        self.dataset_dir = dataset_dir
+        self.drop_mode = drop_mode
+        self.possible_dropped_modality_combinations = possible_dropped_modality_combinations
+        self.unimodality = unimodality
+        self.seed = seed
+
+        if not os.path.isdir(dataset_dir):
+            raise FileNotFoundError(f'Expected preprocessed dataset dir at {dataset_dir}')
+
+        sample_ids = []
+        for fname in os.listdir(dataset_dir):
+            if fname.endswith('.npy') and not fname.endswith('_seg.npy'):
+                sample_ids.append(fname[:-4])
+
+        if len(sample_ids) == 0:
+            raise RuntimeError('No preprocessed samples found (expected .npy files).')
+
+        if unimodality:
+            expected_drop = None
+            sample_img = np.load(os.path.join(dataset_dir, f'{sample_ids[0]}.npy'))
+            expected_drop = sample_img.shape[0] - 1
+            assert isinstance(drop_mode, List) and len(drop_mode) == expected_drop, \
+                f'If unimodality==True, drop_mode must be a size-{expected_drop} List'
+
+        self.sample_ls = _load_split_ids(
+            sample_ids,
+            splits_file_path=splits_file_path,
+            sample_type=sample_type,
+            fold=fold,
+            seed=seed,
+            split_ratios=split_ratios,
+        )
+
+        self.sample_transforms = self._get_sample_transforms()
+
+    def __len__(self):
+        return len(self.sample_ls)
+
+    def _get_sample_transforms(self):
+        if self.sample_type == 'train':
+            sample_transforms = [
+                SpatialPadd(keys=['img', 'label'], spatial_size=[128] * 3, mode='symmetric'),
+                RandSpatialCropd(keys=['img', 'label'], roi_size=[128] * 3),
+                RandFlipd(keys=['img', 'label'], prob=.5, spatial_axis=0),
+                RandFlipd(keys=['img', 'label'], prob=.5, spatial_axis=1),
+                RandFlipd(keys=['img', 'label'], prob=.5, spatial_axis=2),
+                RandGaussianNoised(keys='img', prob=.15, mean=.0, std=.33 * random.random()),
+                RandGaussianSmoothd(keys='img', prob=.15, sigma_x=(.5, 1.5), sigma_y=(.5, 1.5), sigma_z=(.5, 1.5)),
+                RandAdjustContrastd(keys='img', prob=.15, gamma=(.7, 1.4)),
+                RandScaleIntensityd(keys='img', prob=.15, factors=(0.7, 1.4))
+            ]
+        elif self.sample_type == 'val':
+            sample_transforms = [
+                CenterSpatialCropd(keys=['img', 'label'], roi_size=[128] * 3),
+                SpatialPadd(keys=['img', 'label'], spatial_size=[128] * 3, mode='symmetric'),
+            ]
+        else:
+            sample_transforms = [
+                SpatialPadd(keys=['img', 'label'], spatial_size=[128] * 3, mode='symmetric'),
+            ]
+
+        return Compose(sample_transforms)
+
+    def __getitem__(self, idx):
+        case_id = self.sample_ls[idx]
+        img = np.load(os.path.join(self.dataset_dir, f'{case_id}.npy'))
+        label = np.load(os.path.join(self.dataset_dir, f'{case_id}_seg.npy'))
+
+        sample = {
+            'img': img,
+            'label': label,
+        }
+
+        sample = self.sample_transforms(sample)
+
+        num_modalities = img.shape[0]
+        sample['mask_code'] = torch.ones(num_modalities)
+
+        if isinstance(self.drop_mode, str) and self.drop_mode == 'rand':
+            drop_mods = random.choice(self.possible_dropped_modality_combinations)
+            sample['mask_code'] = torch.tensor([0 if _ in drop_mods else 1 for _ in range(num_modalities)])
+            sample['img'][drop_mods, ...] = 0
+        elif isinstance(self.drop_mode, List):
+            sample['mask_code'] = torch.tensor([0 if _ in self.drop_mode else 1 for _ in range(num_modalities)])
+            if self.unimodality:
+                for c in range(num_modalities):
+                    if c not in self.drop_mode:
+                        sample['img'] = sample['img'][c: c + 1]
+            else:
+                sample['img'][self.drop_mode, ...] = 0
+        elif self.drop_mode is not None:
+            raise NotImplementedError
+
+        sample['mask_encoding'] = (
+            torch.sum(sample['mask_code'] * torch.tensor([2 ** idx for idx in range(num_modalities)]))
+        ).to(torch.int64)
+        sample['weight'] = 2 if torch.sum(sample['mask_code']) == 1 else 1
+        sample['sample_id'] = case_id
+
+        return sample
+
+
 class LldMmriPairedDataset(LldMmriDataset):
     def __getitem__(self, idx):
         case_id = self.sample_ls[idx]

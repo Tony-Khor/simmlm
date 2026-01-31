@@ -52,6 +52,18 @@ By default, the pipeline reads all eight modalities and uses the `C+A` label fil
 You can change the modality order, label modality, and train/val/test split ratios in
 `configs_expert_pretraining.py` and `configs_joint_training.py`.
 
+To preprocess and standardize the dataset into `.npy` files, run:
+
+```
+python dataset/preprocess_lld_mmri.py \
+  --input-dir assets/data/lld-mmri \
+  --output-dir assets/data/lld-mmri_preprocessed \
+  --modalities C+A C+Delay C+V C-pre DWI InPhase OutPhase T2WI \
+  --label-modality C+A
+```
+
+Then set `USE_PREPROCESSED = True` and `SPLITS_FILE_PATH = "assets/data/lld-mmri_preprocessed/splits.json"` in the config files.
+
 ---
 
 ### 2. Training Set Split File

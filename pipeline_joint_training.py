@@ -11,34 +11,61 @@ from datetime import datetime
 import SimpleITK as sitk
 from pytorch_lightning.utilities.seed import seed_everything
 
-from dataset.processors import SingleStreamDataset, BratsEvalSet, PairedDataset
+from dataset.processors import SingleStreamDataset, BratsEvalSet, PairedDataset, LldMmriDataset, LldMmriPairedDataset
 from configs_joint_training import DatasetConfig, TrainingConfig, ModelConfig
 from train.trainer_joint_training import train_model
 from models.dmome import DMoMEOutputLevel, DMoMEFeatureLevel, DMoMEProbLevel
 from models.momke import MoMKE
 
 
+def _get_dataset_cls():
+    if DatasetConfig.DATASET_NAME == 'lld-mmri':
+        return LldMmriDataset
+    return SingleStreamDataset
+
+
+def _get_train_dataset_cls():
+    if DatasetConfig.DATASET_NAME == 'lld-mmri':
+        return LldMmriPairedDataset
+    return PairedDataset
+
+
+def _get_dataset_kwargs():
+    if DatasetConfig.DATASET_NAME == 'lld-mmri':
+        return {
+            'modalities': DatasetConfig.MODALITIES,
+            'label_modality': DatasetConfig.LABEL_MODALITY,
+            'split_ratios': DatasetConfig.SPLIT_RATIOS,
+            'seed': TrainingConfig.RANDOM_SEED,
+        }
+    return {}
+
+
 def get_val_ds():
+    dataset_cls = _get_dataset_cls()
+    dataset_kwargs = _get_dataset_kwargs()
     if DatasetConfig.VAL_DROP_MODE == 'all':
         val_ds = None
         for dropped_mods in DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS:
-            cur_ds = SingleStreamDataset(
+            cur_ds = dataset_cls(
                 sample_type='val', dataset_dir=DatasetConfig.DATASET_DIR,
                 splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
                 drop_mode=dropped_mods,
                 possible_dropped_modality_combinations=DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS,
-                fold=DatasetConfig.FOLD
+                fold=DatasetConfig.FOLD,
+                **dataset_kwargs,
             )
             if val_ds is None:
                 val_ds = cur_ds
             else:
                 val_ds = torch.utils.data.ConcatDataset([val_ds, cur_ds])
     else:
-        val_ds = SingleStreamDataset(
+        val_ds = dataset_cls(
             sample_type='val', dataset_dir=DatasetConfig.DATASET_DIR, splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
             drop_mode=DatasetConfig.VAL_DROP_MODE,
             possible_dropped_modality_combinations=DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS,
-            fold=DatasetConfig.FOLD
+            fold=DatasetConfig.FOLD,
+            **dataset_kwargs,
         )
 
     return val_ds
@@ -60,6 +87,9 @@ def load_model():
 
 # Run and save BraTS evaluation set. The saved segmentation results can be uploaded to BraTS official evaluation platform for metrics.
 def run_eval():
+    if DatasetConfig.DATASET_NAME != 'brats':
+        print('Skipping BraTS eval set (not applicable for current dataset).')
+        return
     for model_name in ['ckpt_bst.pt', 'ckpt_final.pt']:
 
         net = load_model()
@@ -137,11 +167,14 @@ def main():
 
     net = load_model()
 
-    train_ds = PairedDataset(
+    dataset_cls = _get_train_dataset_cls()
+    dataset_kwargs = _get_dataset_kwargs()
+    train_ds = dataset_cls(
         sample_type='train', dataset_dir=DatasetConfig.DATASET_DIR, splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
         drop_mode=DatasetConfig.DROP_MODE,
         possible_dropped_modality_combinations=DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS,
-        fold=DatasetConfig.FOLD
+        fold=DatasetConfig.FOLD,
+        **dataset_kwargs,
     )
 
     train_dl = DataLoader(
@@ -182,12 +215,13 @@ def main():
 
         for dropped_mods in DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS:
 
-            test_ds = SingleStreamDataset(
+            test_ds = dataset_cls(
                 sample_type='test', dataset_dir=DatasetConfig.DATASET_DIR,
                 splits_file_path=DatasetConfig.SPLITS_FILE_PATH,
                 drop_mode=dropped_mods,
                 possible_dropped_modality_combinations=DatasetConfig.POSSIBLE_DROPPED_MODALITY_COMBINATIONS,
-                fold=DatasetConfig.FOLD
+                fold=DatasetConfig.FOLD,
+                **dataset_kwargs,
             )
             test_dl = DataLoader(test_ds, batch_size=1, shuffle=False, num_workers=4)
 

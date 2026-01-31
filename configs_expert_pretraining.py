@@ -1,6 +1,9 @@
+from itertools import combinations
+
+
 class UNetConfig:
-    INPUT_CHANNELS = 4
-    N_CLASSES = 3
+    INPUT_CHANNELS = 1
+    N_CLASSES = 1
     N_STAGES = 6
     # # original nnunet setting
     # N_FEATURES_PER_STAGE = [32, 64, 128, 256, 320, 320]
@@ -13,18 +16,22 @@ class UNetConfig:
 
 
 class DatasetConfig:
-    DATASET_DIR = 'assets/data/nnUNet_preprocessed_BraTS2018'
-    SPLITS_FILE_PATH = 'assets/kfold_splits.json'
-    EVAL_SET_DIR = 'assets/data/BraTS2018_eval'
+    DATASET_NAME = 'lld-mmri'
+    DATASET_DIR = 'assets/data/lld-mmri'
+    SPLITS_FILE_PATH = None
+    EVAL_SET_DIR = None
+    MODALITIES = ['C+A', 'C+Delay', 'C+V', 'C-pre', 'DWI', 'InPhase', 'OutPhase', 'T2WI']
+    LABEL_MODALITY = 'C+A'
+    SPLIT_RATIOS = (0.8, 0.1, 0.1)
 
-    # DROP_MODE: Which modalities are dropped. For modality expert pretraining, you should train the four modality experts using [0, 1, 2] / [0, 1, 3] / [0, 2, 3] / [1, 2, 3]
-    DROP_MODE = [0, 1, 3]
+    # DROP_MODE: Which modalities are dropped. For modality expert pretraining, set seven indices to keep one modality.
+    DROP_MODE = [0, 1, 2, 3, 4, 5, 6]
     VAL_DROP_MODE = DROP_MODE
+    NUM_MODALITIES = len(MODALITIES)
     POSSIBLE_DROPPED_MODALITY_COMBINATIONS = [
-        [], [0], [1], [2], [3],
-        [0, 1], [0, 2], [0, 3],
-        [1, 2], [1, 3], [2, 3],
-        [0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]
+        list(combo)
+        for r in range(0, NUM_MODALITIES + 1)
+        for combo in combinations(range(NUM_MODALITIES), r)
     ]
     # K-fold id; Here we only run the 0th fold
     FOLD = 0

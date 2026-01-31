@@ -1,8 +1,11 @@
+from itertools import combinations
+
+
 class ModelConfig:
     # DMoMEOutputLevel, DMoMEProbLevel, DMoMEFeatureLevel, MoMKE
     MODEL = 'DMoMEOutputLevel'
-    INPUT_CHANNELS = 4
-    N_CLASSES = 3
+    INPUT_CHANNELS = 8
+    N_CLASSES = 1
     N_STAGES = 6
     # # original nnunet setting
     # N_FEATURES_PER_STAGE = [32, 64, 128, 256, 320, 320]
@@ -11,13 +14,8 @@ class ModelConfig:
     N_FEATURES_PER_STAGE = [8, 16, 32, 64, 80, 80]
     KERNEL_SIZES = [[3, 3, 3]] * 6
     STRIDES = [[1, 1, 1], *[[2, 2, 2]] * 5]
-    # Use pre-trained modality experts to initialize the DMoME. You may also try skip the expert pretraining stage by setting the list as [None] * 4
-    PRETRAINED_EXPERT_FILE_LIST = [
-        'saved_models/modality_expert_0/ckpt_bst.pt',
-        'saved_models/modality_expert_1/ckpt_bst.pt',
-        'saved_models/modality_expert_2/ckpt_bst.pt',
-        'saved_models/modality_expert_3/ckpt_bst.pt',
-    ]
+    # Use pre-trained modality experts to initialize the DMoME. You may also try skip the expert pretraining stage by setting the list as [None] * INPUT_CHANNELS
+    PRETRAINED_EXPERT_FILE_LIST = [None] * INPUT_CHANNELS
 
     TRAIN_LOSS_ARGS = {
         'need_sigmoid': True,
@@ -33,17 +31,21 @@ class ModelConfig:
 
 
 class DatasetConfig:
-    DATASET_DIR = 'assets/data/nnUNet_preprocessed_BraTS2018'
-    SPLITS_FILE_PATH = 'assets/kfold_splits.json'
-    EVAL_SET_DIR = 'assets/data/BraTS2018_eval'
+    DATASET_NAME = 'lld-mmri'
+    DATASET_DIR = 'assets/data/lld-mmri'
+    SPLITS_FILE_PATH = None
+    EVAL_SET_DIR = None
+    MODALITIES = ['C+A', 'C+Delay', 'C+V', 'C-pre', 'DWI', 'InPhase', 'OutPhase', 'T2WI']
+    LABEL_MODALITY = 'C+A'
+    SPLIT_RATIOS = (0.8, 0.1, 0.1)
 
     DROP_MODE = 'rand'
     VAL_DROP_MODE = 'all'
+    NUM_MODALITIES = len(MODALITIES)
     POSSIBLE_DROPPED_MODALITY_COMBINATIONS = [
-        [], [0], [1], [2], [3],
-        [0, 1], [0, 2], [0, 3],
-        [1, 2], [1, 3], [2, 3],
-        [0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]
+        list(combo)
+        for r in range(0, NUM_MODALITIES + 1)
+        for combo in combinations(range(NUM_MODALITIES), r)
     ]
     # K-fold id; Here we only run the 0th fold
     FOLD = 0

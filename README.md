@@ -1,6 +1,7 @@
 # SimMLM: A Simple Framework for Multi-modal Learning with Missing Modality
 
 The repo contains the codebase used for our main task (**BraTS 2018**) in the paper.  
+The codebase can also be configured to run on the **LLD-MMRI** liver tumor dataset structure described below.
 
 ---
 
@@ -18,6 +19,38 @@ Place the preprocessed samples here:
 ```
 assets/data/nnUNet_preprocessed_BraTS2018/
 ```
+
+---
+
+### LLD-MMRI (8 MRI modalities + liver tumor labels)
+
+Expected folder layout:
+
+```
+assets/data/lld-mmri/
+  images/
+    <CASE_ID>_C+A_0000.nii.gz
+    <CASE_ID>_C+Delay_0000.nii.gz
+    <CASE_ID>_C+V_0000.nii.gz
+    <CASE_ID>_C-pre_0000.nii.gz
+    <CASE_ID>_DWI_0000.nii.gz
+    <CASE_ID>_InPhase_0000.nii.gz
+    <CASE_ID>_OutPhase_0000.nii.gz
+    <CASE_ID>_T2WI_0000.nii.gz
+  labels/
+    <CASE_ID>_C+A.nii.gz
+    <CASE_ID>_C+Delay.nii.gz
+    <CASE_ID>_C+V.nii.gz
+    <CASE_ID>_C-pre.nii.gz
+    <CASE_ID>_DWI.nii.gz
+    <CASE_ID>_InPhase.nii.gz
+    <CASE_ID>_OutPhase.nii.gz
+    <CASE_ID>_T2WI.nii.gz
+```
+
+By default, the pipeline reads all eight modalities and uses the `C+A` label file as the segmentation target.
+You can change the modality order, label modality, and train/val/test split ratios in
+`configs_expert_pretraining.py` and `configs_joint_training.py`.
 
 ---
 

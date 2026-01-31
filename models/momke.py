@@ -36,21 +36,20 @@ class MoMKE(nn.Module):
                 "loss for this model needs sigmoid!"
         self.pretrained_expert_file_list = ModelConfig.PRETRAINED_EXPERT_FILE_LIST
         self.n_stages = ModelConfig.N_STAGES
+        self.num_modalities = ModelConfig.INPUT_CHANNELS
+        if len(self.pretrained_expert_file_list) != self.num_modalities:
+            raise ValueError('PRETRAINED_EXPERT_FILE_LIST must match INPUT_CHANNELS')
 
         self.expert_ls = nn.ModuleList([
-            self._build_single_expert(0),
-            self._build_single_expert(1),
-            self._build_single_expert(2),
-            self._build_single_expert(3)
+            self._build_single_expert(expert_id)
+            for expert_id in range(self.num_modalities)
         ])
         self.router_ls = nn.ModuleList([
-            self._build_router(),
-            self._build_router(),
-            self._build_router(),
             self._build_router()
+            for _ in range(self.num_modalities)
         ])
         self.segmentation_head = nn.Conv3d(
-            in_channels=4 * self.expert_ls[0].seg_layers[-1].in_channels,
+            in_channels=self.num_modalities * self.expert_ls[0].seg_layers[-1].in_channels,
             out_channels=self.expert_ls[0].seg_layers[-1].out_channels,
             kernel_size=1,
             stride=1,
@@ -76,23 +75,23 @@ class MoMKE(nn.Module):
 
     def _build_router(self):
         router = nn.Sequential(
-            nn.Conv3d(in_channels=1, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=1, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
             nn.Flatten(),
-            nn.Linear(in_features=256, out_features=4),
+            nn.Linear(in_features=self.num_modalities * 64, out_features=self.num_modalities),
         ).cuda()
 
         return router
@@ -108,19 +107,19 @@ class MoMKE(nn.Module):
                 (
                         torch.stack([self.expert_ls[expert_idx](
                             x[sample_idx:sample_idx + 1, modality_idx:modality_idx + 1, ...])
-                                     for expert_idx in range(4)], dim=1) *
+                                     for expert_idx in range(self.num_modalities)], dim=1) *
                         (
                             nn.functional.softmax(
                                 self.router_ls[modality_idx](
                                     x[sample_idx:sample_idx + 1, modality_idx:modality_idx + 1, ...]), dim=1
-                            ).view(-1, 4, 1, 1, 1, 1)
+                            ).view(-1, self.num_modalities, 1, 1, 1, 1)
                         )
                 ).sum(dim=1)
 
                 for sample_idx in range(x.shape[0])
             ], dim=0)
 
-            for modality_idx in range(4)
+            for modality_idx in range(self.num_modalities)
         ], dim=1)
 
         output = self.segmentation_head(output)

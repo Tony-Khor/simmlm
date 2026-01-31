@@ -17,31 +17,33 @@ class DMoMEOutputLevel(nn.Module):
 
         self.pretrained_expert_file_list = ModelConfig.PRETRAINED_EXPERT_FILE_LIST
         self.n_stages = ModelConfig.N_STAGES
+        self.num_modalities = ModelConfig.INPUT_CHANNELS
+        self.num_classes = ModelConfig.N_CLASSES
+        if len(self.pretrained_expert_file_list) != self.num_modalities:
+            raise ValueError('PRETRAINED_EXPERT_FILE_LIST must match INPUT_CHANNELS')
 
         self.expert_ls = nn.ModuleList([
-            self._build_single_expert(0),
-            self._build_single_expert(1),
-            self._build_single_expert(2),
-            self._build_single_expert(3)
+            self._build_single_expert(expert_id)
+            for expert_id in range(self.num_modalities)
         ])
         self.router = nn.Sequential(
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
             nn.Flatten(),
-            nn.Linear(in_features=256, out_features=4 * 3),
+            nn.Linear(in_features=self.num_modalities * 64, out_features=self.num_modalities * self.num_classes),
         ).cuda()
 
         # self.router = nn.Sequential(
@@ -108,7 +110,7 @@ class DMoMEOutputLevel(nn.Module):
     def forward(self, x):
         modality_mask = (x == 0).all(dim=-1).all(dim=-1).all(dim=-1) # True if modality missing
 
-        weight = self.router(x).view(-1, 4, 3, 1, 1, 1)
+        weight = self.router(x).view(-1, self.num_modalities, self.num_classes, 1, 1, 1)
         weight[modality_mask] = float('-inf')
         weight = nn.functional.softmax(weight, dim=1)
 
@@ -119,7 +121,7 @@ class DMoMEOutputLevel(nn.Module):
                 else self.expert_ls[modality_idx](x[sample_idx:sample_idx + 1, modality_idx:modality_idx + 1, ...])
                 for sample_idx in range(x.shape[0])
             ], dim=0)
-            for modality_idx in range(4)
+            for modality_idx in range(self.num_modalities)
         ], dim=1)
 
         output = output * weight
@@ -139,31 +141,33 @@ class DMoMEProbLevel(nn.Module):
 
         self.pretrained_expert_file_list = ModelConfig.PRETRAINED_EXPERT_FILE_LIST
         self.n_stages = ModelConfig.N_STAGES
+        self.num_modalities = ModelConfig.INPUT_CHANNELS
+        self.num_classes = ModelConfig.N_CLASSES
+        if len(self.pretrained_expert_file_list) != self.num_modalities:
+            raise ValueError('PRETRAINED_EXPERT_FILE_LIST must match INPUT_CHANNELS')
 
         self.expert_ls = nn.ModuleList([
-            self._build_single_expert(0),
-            self._build_single_expert(1),
-            self._build_single_expert(2),
-            self._build_single_expert(3)
+            self._build_single_expert(expert_id)
+            for expert_id in range(self.num_modalities)
         ])
         self.router = nn.Sequential(
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
             nn.Flatten(),
-            nn.Linear(in_features=256, out_features=4 * 3),
+            nn.Linear(in_features=self.num_modalities * 64, out_features=self.num_modalities * self.num_classes),
         ).cuda()
 
         self.expert_output_shape = self.expert_ls[0](torch.rand(1, 1, 128, 128, 128).cuda()).shape
@@ -186,7 +190,7 @@ class DMoMEProbLevel(nn.Module):
     def forward(self, x):
         modality_mask = (x == 0).all(dim=-1).all(dim=-1).all(dim=-1)
 
-        weight = self.router(x).view(-1, 4, 3, 1, 1, 1)
+        weight = self.router(x).view(-1, self.num_modalities, self.num_classes, 1, 1, 1)
         weight[modality_mask] = float('-inf')
         weight = nn.functional.softmax(weight, dim=1)
 
@@ -200,7 +204,7 @@ class DMoMEProbLevel(nn.Module):
                 )
                 for sample_idx in range(x.shape[0])
             ], dim=0)
-            for modality_idx in range(4)
+            for modality_idx in range(self.num_modalities)
         ], dim=1)
 
         output = output * weight
@@ -240,31 +244,32 @@ class DMoMEFeatureLevel(nn.Module):
                 "loss for this model needs sigmoid!"
         self.pretrained_expert_file_list = ModelConfig.PRETRAINED_EXPERT_FILE_LIST
         self.n_stages = ModelConfig.N_STAGES
+        self.num_modalities = ModelConfig.INPUT_CHANNELS
+        if len(self.pretrained_expert_file_list) != self.num_modalities:
+            raise ValueError('PRETRAINED_EXPERT_FILE_LIST must match INPUT_CHANNELS')
 
         self.expert_ls = nn.ModuleList([
-            self._build_single_expert(0),
-            self._build_single_expert(1),
-            self._build_single_expert(2),
-            self._build_single_expert(3)
+            self._build_single_expert(expert_id)
+            for expert_id in range(self.num_modalities)
         ])
         self.router = nn.Sequential(
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels=4, out_channels=4, kernel_size=3, stride=2, padding=1),
-            nn.InstanceNorm3d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
+            nn.Conv3d(in_channels=self.num_modalities, out_channels=self.num_modalities, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm3d(self.num_modalities, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False),
             nn.ReLU(inplace=True),
             nn.Flatten(),
-            nn.Linear(in_features=256, out_features=4),
+            nn.Linear(in_features=self.num_modalities * 64, out_features=self.num_modalities),
         ).cuda()
         self.segmentation_head = nn.Conv3d(
             in_channels=self.expert_ls[0].seg_layers[-1].in_channels,
@@ -308,7 +313,7 @@ class DMoMEFeatureLevel(nn.Module):
                                                   )*weight[sample_idx, modality_idx]
                 for sample_idx in range(x.shape[0])
             ], dim=0)
-            for modality_idx in range(4)
+            for modality_idx in range(self.num_modalities)
         ], dim=1)
         output = output.sum(dim=1)
         output = self.segmentation_head(output)
